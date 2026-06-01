@@ -220,6 +220,7 @@ pub struct HookServer {
     config_store: Arc<std::sync::Mutex<Option<ConfigStore>>>,
     /// IPC endpoint owned by this server instance.
     endpoint: hook_endpoint::HookEndpoint,
+    #[cfg(unix)]
     socket_owned: Arc<AtomicBool>,
     /// Recent PreToolUse cache for PermissionRequest correlation when Codex omits tool_use_id.
     recent_tools: Arc<Mutex<VecDeque<RecentToolInvocation>>>,
@@ -270,6 +271,7 @@ impl HookServer {
             raw_events: Arc::new(std::sync::Mutex::new(RawHookEventStore::new())),
             config_store: Arc::new(std::sync::Mutex::new(None)),
             endpoint: hook_endpoint::current(),
+            #[cfg(unix)]
             socket_owned: Arc::new(AtomicBool::new(false)),
             recent_tools: Arc::new(Mutex::new(VecDeque::new())),
         }

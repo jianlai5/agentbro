@@ -103,7 +103,7 @@ jobs:
 
       - name: Build Windows installers
         working-directory: src-tauri
-        run: cargo tauri build --bundles nsis,msi --ci --no-sign --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        run: cargo tauri build --bundles nsis --ci --no-sign --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
@@ -111,5 +111,4 @@ jobs:
           name: windows-installers
           path: |
             src-tauri/target/release/bundle/nsis
-            src-tauri/target/release/bundle/msi
           if-no-files-found: error
