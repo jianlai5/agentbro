@@ -271,21 +271,30 @@ fn raw_bridge_binary_path() -> PathBuf {
 
 pub fn endpoint_env_assignments() -> Vec<String> {
     let endpoint = crate::hook_endpoint::current();
-    let mut assignments = vec![format!(
-        "{}={}",
-        crate::hook_endpoint::HOOK_PORT_ENV,
-        endpoint.tcp_port
-    )];
     #[cfg(unix)]
-    assignments.insert(
-        0,
-        format!(
+    {
+        return vec![
+            format!(
+                "{}={}",
+                crate::hook_endpoint::HOOK_SOCKET_ENV,
+                shell_quote(&endpoint.socket_path)
+            ),
+            format!(
+                "{}={}",
+                crate::hook_endpoint::HOOK_PORT_ENV,
+                endpoint.tcp_port
+            ),
+        ];
+    }
+
+    #[cfg(not(unix))]
+    {
+        vec![format!(
             "{}={}",
-            crate::hook_endpoint::HOOK_SOCKET_ENV,
-            shell_quote(&endpoint.socket_path)
-        ),
-    );
-    assignments
+            crate::hook_endpoint::HOOK_PORT_ENV,
+            endpoint.tcp_port
+        )]
+    }
 }
 
 pub fn bridge_command_parts(bridge: &Path, args: &[String]) -> Vec<String> {

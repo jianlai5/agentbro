@@ -30,7 +30,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io::{BufRead, BufReader as StdBufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+#[cfg(target_os = "macos")]
+use std::process::Command;
+use std::process::Stdio;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -4133,7 +4135,7 @@ fn can_fallback_to_terminal_app(terminal: &str) -> bool {
     crate::terminal::registry::is_terminal(terminal)
 }
 
-fn open_terminal_at_cwd(terminal: &str, cwd: &str) -> Result<(), String> {
+fn open_terminal_at_cwd(_terminal: &str, cwd: &str) -> Result<(), String> {
     let cwd = cwd.trim();
     if cwd.is_empty() {
         return Err("Session has no working directory".to_string());
@@ -4145,7 +4147,7 @@ fn open_terminal_at_cwd(terminal: &str, cwd: &str) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        let app = fallback_terminal_app_name(terminal);
+        let app = fallback_terminal_app_name(_terminal);
         let output = std::process::Command::new("/usr/bin/open")
             .args(["-a", app, cwd])
             .output()

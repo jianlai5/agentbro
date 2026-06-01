@@ -247,12 +247,12 @@ async fn read_attach_stderr(host_id: String, stderr: tokio::process::ChildStderr
 }
 
 async fn forward_to_local_hook_server(
-    local_socket_path: &str,
+    _local_socket_path: &str,
     payload: &Value,
     expects_response: bool,
 ) -> Result<Option<Value>, String> {
     #[cfg(unix)]
-    let mut stream = UnixStream::connect(local_socket_path)
+    let mut stream = UnixStream::connect(_local_socket_path)
         .await
         .map_err(|err| format!("connect local hook socket: {err}"))?;
     #[cfg(not(unix))]
