@@ -12,6 +12,7 @@ pub mod platform;
 pub mod remote;
 pub mod skills;
 pub mod sound;
+pub mod startup_logging;
 pub mod switch;
 pub mod telemetry;
 pub mod terminal;
@@ -4606,7 +4607,9 @@ async fn resize_notch(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    startup_logging::log_startup_info("building tauri application");
+
+    let app = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
@@ -5317,6 +5320,10 @@ pub fn run() {
             switch::commands::switch_get_provider_health,
             switch::commands::switch_speed_test,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running AgentBro");
+        .run(tauri::generate_context!());
+
+    if let Err(err) = app {
+        startup_logging::log_startup_error(&format!("error while running AgentBro: {err}"));
+        panic!("error while running AgentBro: {err}");
+    }
 }

@@ -62,11 +62,15 @@ fn close_inherited_file_descriptors() {
 }
 
 fn main() {
+    agentbro_lib::startup_logging::init_startup_logging();
+    agentbro_lib::startup_logging::log_startup_info("entered main()");
+
     #[cfg(unix)]
     {
         raise_file_descriptor_limit();
         close_inherited_file_descriptors();
     }
 
+    agentbro_lib::startup_logging::log_startup_info("launching agentbro_lib::run()");
     agentbro_lib::run()
 }
