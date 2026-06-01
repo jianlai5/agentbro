@@ -48,11 +48,11 @@ jobs:
       - name: Build frontend
         run: pnpm build
 
-      - name: Check Rust backend
-        run: cargo check --manifest-path src-tauri/Cargo.toml
-
       - name: Build bridge resource
         run: pnpm build:bridge
+
+      - name: Check Rust backend
+        run: cargo check --manifest-path src-tauri/Cargo.toml
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
