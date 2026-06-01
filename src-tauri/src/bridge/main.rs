@@ -6,6 +6,7 @@
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
+#[cfg(unix)]
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
@@ -13,6 +14,7 @@ const TIMEOUT_SECONDS: u64 = 21_600;
 
 /// Polymorphic stream: Unix socket or TCP
 enum Stream {
+    #[cfg(unix)]
     Unix(UnixStream),
     Tcp(TcpStream),
 }
@@ -20,6 +22,7 @@ enum Stream {
 impl Read for Stream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
+            #[cfg(unix)]
             Stream::Unix(s) => s.read(buf),
             Stream::Tcp(s) => s.read(buf),
         }
@@ -29,12 +32,14 @@ impl Read for Stream {
 impl Write for Stream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
+            #[cfg(unix)]
             Stream::Unix(s) => s.write(buf),
             Stream::Tcp(s) => s.write(buf),
         }
     }
     fn flush(&mut self) -> io::Result<()> {
         match self {
+            #[cfg(unix)]
             Stream::Unix(s) => s.flush(),
             Stream::Tcp(s) => s.flush(),
         }
@@ -44,6 +49,7 @@ impl Write for Stream {
 impl Stream {
     fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
         match self {
+            #[cfg(unix)]
             Stream::Unix(s) => s.set_read_timeout(dur),
             Stream::Tcp(s) => s.set_read_timeout(dur),
         }
@@ -392,8 +398,11 @@ fn get_tty() -> Option<String> {
 /// Connect to AgentBro: try Unix socket first, fall back to TCP
 fn connect() -> Option<Stream> {
     let endpoint = agentbro_lib::hook_endpoint::current();
-    if let Ok(s) = UnixStream::connect(&endpoint.socket_path) {
-        return Some(Stream::Unix(s));
+    #[cfg(unix)]
+    {
+        if let Ok(s) = UnixStream::connect(&endpoint.socket_path) {
+            return Some(Stream::Unix(s));
+        }
     }
     if let Ok(s) = TcpStream::connect(endpoint.tcp_addr()) {
         return Some(Stream::Tcp(s));
@@ -617,7 +626,7 @@ fn main() {
         &["tool_name", "toolName", "tool", "name"],
     )
     .unwrap_or("");
-    let claude_pid = std::os::unix::process::parent_id();
+    let claude_pid = parent_process_id();
     let tty = get_tty();
     let engine_label = std::env::var("AGENTBRO_ENGINE_LABEL").ok();
     let engine_config_root = std::env::var("AGENTBRO_CONFIG_ROOT").ok();
@@ -1180,6 +1189,17 @@ fn main() {
 
     // Send event (non-PermissionRequest path)
     send_and_maybe_receive(&state, false);
+}
+
+fn parent_process_id() -> u32 {
+    #[cfg(unix)]
+    {
+        std::os::unix::process::parent_id()
+    }
+    #[cfg(not(unix))]
+    {
+        0
+    }
 }
 
 #[cfg(test)]

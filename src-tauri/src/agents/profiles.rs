@@ -1483,20 +1483,14 @@ pub fn managed_bridge_command_labeled(
     let bridge = hook_manager::ensure_bridge_binary()?;
     let mut args = vec!["--source".to_string(), profile.source.to_string()];
     args.extend(profile.extra_args.iter().map(|arg| arg.to_string()));
-    let mut parts = hook_manager::bridge_command_parts(&bridge, &args);
+    let mut extra_env = Vec::new();
     if let Some(label) = engine_label {
-        parts.insert(
-            1,
-            format!("AGENTBRO_ENGINE_LABEL={}", hook_manager::shell_quote(label)),
-        );
+        extra_env.push(("AGENTBRO_ENGINE_LABEL", label));
     }
     if let Some(root) = config_root {
-        parts.insert(
-            if engine_label.is_some() { 2 } else { 1 },
-            format!("AGENTBRO_CONFIG_ROOT={}", hook_manager::shell_quote(root)),
-        );
+        extra_env.push(("AGENTBRO_CONFIG_ROOT", root));
     }
-    Ok(parts.join(" "))
+    Ok(hook_manager::bridge_command(&bridge, &args, &extra_env))
 }
 
 fn bridge_args_json(
@@ -1520,18 +1514,30 @@ fn bridge_env_json_labeled(
     engine_label: Option<&str>,
     config_root: Option<&str>,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    let mut env = serde_json::Map::new();
     let endpoint = crate::hook_endpoint::current();
-    let mut env = serde_json::json!({
-        crate::hook_endpoint::HOOK_SOCKET_ENV: endpoint.socket_path,
-        crate::hook_endpoint::HOOK_PORT_ENV: endpoint.tcp_port.to_string(),
-    });
+    #[cfg(unix)]
+    env.insert(
+        crate::hook_endpoint::HOOK_SOCKET_ENV.to_string(),
+        serde_json::Value::String(endpoint.socket_path),
+    );
+    env.insert(
+        crate::hook_endpoint::HOOK_PORT_ENV.to_string(),
+        serde_json::Value::String(endpoint.tcp_port.to_string()),
+    );
     if let Some(label) = engine_label {
-        env["AGENTBRO_ENGINE_LABEL"] = serde_json::Value::String(label.to_string());
+        env.insert(
+            "AGENTBRO_ENGINE_LABEL".to_string(),
+            serde_json::Value::String(label.to_string()),
+        );
     }
     if let Some(root) = config_root {
-        env["AGENTBRO_CONFIG_ROOT"] = serde_json::Value::String(root.to_string());
+        env.insert(
+            "AGENTBRO_CONFIG_ROOT".to_string(),
+            serde_json::Value::String(root.to_string()),
+        );
     }
-    Ok(serde_json::to_string(&env)?)
+    Ok(serde_json::to_string(&serde_json::Value::Object(env))?)
 }
 
 fn enabled_event_names_json(
@@ -1934,7 +1940,7 @@ fn executable_hook_script(
         event.name.to_string(),
     ];
     args.extend(profile.extra_args.iter().map(|arg| arg.to_string()));
-    let command = hook_manager::bridge_command_parts(&bridge, &args).join(" ");
+    let command = hook_manager::bridge_command(&bridge, &args, &[]);
     Ok(format!(
         "#!/bin/bash\n# {}\nINPUT=$(cat)\nprintf '%s' \"$INPUT\" | {} >/dev/null 2>&1 &\nprintf '{{\"cancel\":false}}'\n",
         marker(profile),

@@ -74,7 +74,8 @@
     "resources": {
       "../src/pets": "pets",
       "../src/themes": "themes",
-      "target/agentbro-bridge-resource/agentbro-bridge": "agentbro-bridge"
+      "target/agentbro-bridge-resource/agentbro-bridge": "agentbro-bridge",
+      "target/agentbro-bridge-resource/agentbro-bridge.exe": "agentbro-bridge.exe"
     }
   }
 }

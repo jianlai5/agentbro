@@ -7,6 +7,8 @@ use serde_json::Value;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpStream;
+#[cfg(unix)]
 use tokio::net::UnixStream;
 use tokio::process::{Child, ChildStdin};
 
@@ -249,9 +251,15 @@ async fn forward_to_local_hook_server(
     payload: &Value,
     expects_response: bool,
 ) -> Result<Option<Value>, String> {
+    #[cfg(unix)]
     let mut stream = UnixStream::connect(local_socket_path)
         .await
         .map_err(|err| format!("connect local hook socket: {err}"))?;
+    #[cfg(not(unix))]
+    let mut stream = TcpStream::connect(crate::hook_endpoint::current().tcp_addr())
+        .await
+        .map_err(|err| format!("connect local hook TCP server: {err}"))?;
+
     let body = serde_json::to_string(payload).map_err(|err| err.to_string())?;
     stream
         .write_all(body.as_bytes())

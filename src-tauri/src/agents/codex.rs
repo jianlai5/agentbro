@@ -1102,7 +1102,7 @@ fn ensure_codex_hooks_feature(content: &str) -> String {
     lines.join("\n")
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::os::unix::process::ExitStatusExt;

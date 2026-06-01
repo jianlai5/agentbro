@@ -3616,14 +3616,17 @@ pub async fn simulate_hook_event(
         let bytes = line.as_bytes();
         let endpoint = hook_endpoint::current();
 
-        if let Ok(mut stream) = tokio::net::UnixStream::connect(&endpoint.socket_path).await {
-            stream.write_all(bytes).await.map_err(|e| e.to_string())
-        } else {
-            let mut stream = tokio::net::TcpStream::connect(endpoint.tcp_addr())
-                .await
-                .map_err(|e| e.to_string())?;
-            stream.write_all(bytes).await.map_err(|e| e.to_string())
+        #[cfg(unix)]
+        {
+            if let Ok(mut stream) = tokio::net::UnixStream::connect(&endpoint.socket_path).await {
+                return stream.write_all(bytes).await.map_err(|e| e.to_string());
+            }
         }
+
+        let mut stream = tokio::net::TcpStream::connect(endpoint.tcp_addr())
+            .await
+            .map_err(|e| e.to_string())?;
+        stream.write_all(bytes).await.map_err(|e| e.to_string())
     }
 
     let sid = format!("simulate-{}", uuid::Uuid::new_v4());
@@ -4334,16 +4337,28 @@ pub async fn run_hook_doctor(state: State<'_, AppState>) -> Result<HookDoctorRep
     });
 
     let endpoint = hook_endpoint::current();
+    #[cfg(unix)]
     let socket_status = tokio::time::timeout(
         Duration::from_millis(300),
         tokio::net::UnixStream::connect(&endpoint.socket_path),
     )
     .await
     .is_ok_and(|result| result.is_ok());
+    #[cfg(not(unix))]
+    let socket_status = false;
     checks.push(HookDoctorCheck {
         id: "hook-server".to_string(),
         label: "Hook server socket".to_string(),
-        status: if socket_status { "ok" } else { "warn" }.to_string(),
+        status: if cfg!(unix) {
+            if socket_status {
+                "ok"
+            } else {
+                "warn"
+            }
+        } else {
+            "skip"
+        }
+        .to_string(),
         detail: endpoint.socket_path.clone(),
     });
 

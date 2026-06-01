@@ -1,5 +1,4 @@
 use base64::Engine as _;
-use std::io::{BufRead as _, Write as _};
 
 pub fn focus_block(block_id: &str, tab_id: &str, jwt: &str) -> Result<(), String> {
     let mut client = WaveRpcClient::connect(jwt)?;
@@ -26,11 +25,16 @@ pub fn send_input(block_id: &str, jwt: &str, input: &str) -> Result<(), String> 
     Ok(())
 }
 
+#[cfg(unix)]
+use std::io::{BufRead as _, Write as _};
+
+#[cfg(unix)]
 struct WaveRpcClient {
     writer: std::os::unix::net::UnixStream,
     reader: std::io::BufReader<std::os::unix::net::UnixStream>,
 }
 
+#[cfg(unix)]
 impl WaveRpcClient {
     fn connect(jwt: &str) -> Result<Self, String> {
         let sock = socket_from_jwt(jwt)?;
@@ -109,6 +113,30 @@ impl WaveRpcClient {
     }
 }
 
+#[cfg(not(unix))]
+struct WaveRpcClient;
+
+#[cfg(not(unix))]
+impl WaveRpcClient {
+    fn connect(_jwt: &str) -> Result<Self, String> {
+        Err("Wave RPC is not supported on this platform".to_string())
+    }
+
+    fn authenticate(&mut self, _jwt: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn call(
+        &mut self,
+        _command: &str,
+        _data: serde_json::Value,
+        _route: Option<String>,
+    ) -> Result<(), String> {
+        Err("Wave RPC is not supported on this platform".to_string())
+    }
+}
+
+#[cfg(unix)]
 fn socket_from_jwt(jwt: &str) -> Result<String, String> {
     let payload = jwt
         .split('.')
@@ -126,7 +154,7 @@ fn socket_from_jwt(jwt: &str) -> Result<String, String> {
         .ok_or_else(|| "Wave JWT sock claim missing".to_string())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::socket_from_jwt;
     use base64::Engine as _;
