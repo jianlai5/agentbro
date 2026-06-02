@@ -252,6 +252,7 @@ async fn spawn_and_stream(
         .spawn()
         .map_err(|e| {
             let err = format!("failed to spawn {}: {}", program, e);
+            log::error!("market spawn failed: program={} args={:?} error={}", program, args, err);
             let _ = app.emit(
                 "market:install_done",
                 InstallDoneEvent {
@@ -309,6 +310,7 @@ async fn spawn_and_stream(
         Ok(Ok(status)) => status,
         Ok(Err(e)) => {
             let err = format!("wait failed: {}", e);
+            log::error!("market wait failed: program={} args={:?} error={}", program, args, err);
             let _ = app.emit(
                 "market:install_done",
                 InstallDoneEvent {
@@ -323,6 +325,7 @@ async fn spawn_and_stream(
         Err(_) => {
             let _ = child.start_kill();
             let err = format!("timed out after {}s", SPAWN_TIMEOUT.as_secs());
+            log::error!("market timed out: program={} args={:?} error={}", program, args, err);
             let _ = app.emit(
                 "market:install_done",
                 InstallDoneEvent {
@@ -346,6 +349,15 @@ async fn spawn_and_stream(
     } else {
         Some(format!("exited with code {:?}", exit_code))
     };
+    if let Some(err) = error.as_ref() {
+        log::error!(
+            "market command failed: program={} args={:?} exit_code={:?} error={}",
+            program,
+            args,
+            exit_code,
+            err
+        );
+    }
     let _ = app.emit(
         "market:install_done",
         InstallDoneEvent {

@@ -77,6 +77,18 @@ fn pet_drag_state() -> &'static Mutex<Option<PetDragState>> {
     PET_DRAG_STATE.get_or_init(|| Mutex::new(None))
 }
 
+#[tauri::command]
+fn log_runtime_error(source: String, message: String, context: Option<String>) {
+    let source = source.trim();
+    let message = message.trim();
+    let context = context.unwrap_or_default();
+    if context.trim().is_empty() {
+        log::error!("[runtime:{}] {}", source, message);
+    } else {
+        log::error!("[runtime:{}] {} | context: {}", source, message, context.trim());
+    }
+}
+
 // ── Display Controller Commands ─────────────────────────────────
 
 #[tauri::command]
@@ -5200,6 +5212,7 @@ pub fn run() {
             save_webhook_config,
             test_webhook,
             get_webhook_logs,
+            log_runtime_error,
             get_diagnostic_events,
             commands::buddy::read_buddy_data,
             commands::buddy::buddy_device_snapshot,

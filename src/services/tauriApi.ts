@@ -14,10 +14,79 @@ export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
+let runtimeLoggerInstalled = false
+const baseConsoleError = console.error.bind(console)
+
 /** Lazy invoke — dynamically imports to avoid crash in browser dev mode. */
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core')
-  return tauriInvoke<T>(cmd, args)
+  try {
+    return await tauriInvoke<T>(cmd, args)
+  } catch (error) {
+    void reportRuntimeError('tauri.invoke', `Command failed: ${cmd}`, stringifyForLog({ args, error }))
+    throw error
+  }
+}
+
+function stringifyForLog(value: unknown): string {
+  if (value instanceof Error) {
+    return [value.name, value.message, value.stack].filter(Boolean).join(' | ')
+  }
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+export async function reportRuntimeError(source: string, message: string, context?: string): Promise<void> {
+  if (!isTauri()) {
+    baseConsoleError(`[runtime:${source}] ${message}`, context ?? '')
+    return
+  }
+  try {
+    const { invoke: tauriInvoke } = await import('@tauri-apps/api/core')
+    await tauriInvoke('log_runtime_error', { source, message, context: context ?? null })
+  } catch (error) {
+    baseConsoleError('[runtime] failed to write backend log:', error)
+  }
+}
+
+export function installRuntimeErrorLogging(): void {
+  if (runtimeLoggerInstalled || typeof window === 'undefined') return
+  runtimeLoggerInstalled = true
+
+  console.error = (...args: unknown[]) => {
+    baseConsoleError(...args)
+    const [first, ...rest] = args
+    void reportRuntimeError(
+      'frontend.console',
+      stringifyForLog(first ?? 'console.error'),
+      rest.length > 0 ? rest.map(stringifyForLog).join(' | ') : undefined,
+    )
+  }
+
+  window.addEventListener('error', (event) => {
+    const message = event.message || 'Unhandled window error'
+    const context = stringifyForLog({
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      error: event.error instanceof Error
+        ? { name: event.error.name, message: event.error.message, stack: event.error.stack }
+        : event.error,
+    })
+    void reportRuntimeError('frontend.window', message, context)
+  })
+
+  window.addEventListener('unhandledrejection', (event) => {
+    void reportRuntimeError(
+      'frontend.promise',
+      'Unhandled promise rejection',
+      stringifyForLog(event.reason),
+    )
+  })
 }
 
 export async function getCurrentAppVersion(): Promise<string> {
