@@ -12,11 +12,23 @@ pub fn find_binary(binary: &str) -> Option<PathBuf> {
 
     candidate_dirs()
         .into_iter()
-        .map(|dir| dir.join(binary))
-        .find(|path| path.is_file())
+        .find_map(|dir| candidate_paths(&dir, binary).into_iter().find(|path| path.is_file()))
 }
 
 fn which(binary: &str) -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        return std::process::Command::new("where.exe")
+            .arg(binary)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .and_then(|stdout| stdout.lines().map(str::trim).find(|line| !line.is_empty()).map(PathBuf::from));
+    }
+
+    #[cfg(not(windows))]
+    {
     std::process::Command::new("which")
         .arg(binary)
         .output()
@@ -26,6 +38,7 @@ fn which(binary: &str) -> Option<PathBuf> {
         .map(|path| path.trim().to_string())
         .filter(|path| !path.is_empty())
         .map(PathBuf::from)
+    }
 }
 
 fn candidate_dirs() -> Vec<PathBuf> {
@@ -55,6 +68,35 @@ fn candidate_dirs() -> Vec<PathBuf> {
     }
 
     dirs.into_iter().collect()
+}
+
+fn candidate_paths(dir: &Path, binary: &str) -> Vec<PathBuf> {
+    #[cfg(windows)]
+    {
+        let path = Path::new(binary);
+        if path.extension().is_some() {
+            return vec![dir.join(binary)];
+        }
+
+        let mut candidates = vec![dir.join(binary)];
+        let pathext = std::env::var_os("PATHEXT")
+            .and_then(|value| value.into_string().ok())
+            .unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_string());
+        for ext in pathext.split(';').filter(|ext| !ext.trim().is_empty()) {
+            let normalized = if ext.starts_with('.') {
+                ext.to_string()
+            } else {
+                format!(".{ext}")
+            };
+            candidates.push(dir.join(format!("{binary}{normalized}")));
+        }
+        return candidates;
+    }
+
+    #[cfg(not(windows))]
+    {
+        vec![dir.join(binary)]
+    }
 }
 
 fn nvm_node_bins(home: &Path) -> Vec<PathBuf> {

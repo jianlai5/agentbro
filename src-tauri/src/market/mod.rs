@@ -46,8 +46,10 @@ fn market_path() -> OsString {
 }
 
 fn market_command(program: &str) -> Command {
-    let mut command = Command::new(resolve_program(program));
+    let resolved = resolve_program(program);
+    let mut command = Command::new(&resolved);
     command.env("PATH", market_path());
+    log::info!("market command resolved: {} -> {}", program, resolved.display());
     command
 }
 
